@@ -6,7 +6,7 @@
 #include "RTClib.h"
 #include "EEPROM.h"
 #include <STM32TimerInterrupt.h>
-
+#include <Adafruit_NeoPixel.h>
 // #include <Adafruit_BMP280.h>
 #include <Adafruit_AHTX0.h>
 #include "cus_char.h"
@@ -16,6 +16,13 @@ LiquidCrystal_I2C lcd(0x27,20,4);  // set the LCD address to 0x27 for a 16 chars
 Adafruit_AHTX0 aht;
 
 RTC_DS1307 rtc;
+
+#define NUM_LEDS 16
+// Pin data WS2812
+#define DATA_PIN PA10
+
+// Inisialisasi strip NeoPixel
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_LEDS, DATA_PIN, NEO_GRB + NEO_KHZ800);
 
 STM32Timer Timerstm1(TIM1);
 
@@ -94,7 +101,8 @@ void setup()
     Serial.flush();
     while (1) delay(10);
   }
-
+  strip.begin();
+  strip.show(); // Matikan semua LED
 
 }
 
@@ -244,10 +252,49 @@ char list_menu[][12] = {
   "Keluar"
 };
 
+uint32_t Wheel(byte wheelPos) {
+  if (wheelPos < 85) {
+    return strip.Color(wheelPos * 3, 255 - wheelPos * 3, 0);
+  } else if (wheelPos < 170) {
+    wheelPos -= 85;
+    return strip.Color(255 - wheelPos * 3, 0, wheelPos * 3);
+  } else {
+    wheelPos -= 170;
+    return strip.Color(0, wheelPos * 3, 255 - wheelPos * 3);
+  }
+}
+
 int8_t cursor = 0, menu_selected = 0;
+float brightness = 0;
+int hue = 0;
 void loop()
 {
 
+  for (int i = 0; i < strip.numPixels(); i++) {
+    // Set pixel color using the current hue
+    strip.setPixelColor(i, Wheel((hue + i * 256 / NUM_LEDS) & 255));
+  }
+
+    
+  // Increment hue for the next frame
+  hue++;
+    
+  if (hue >= 256) hue = 0; // Wrap hue around
+  // Serial.println("ldr:"+String(analogRead(PA4)));
+
+  if(analogRead(PA4) < 60)
+  {  
+    brightness += 1;
+  }
+  else
+  {
+    brightness -= 5;
+  }
+  brightness = constrain(brightness, 0, 255);
+  strip.setBrightness(brightness);
+  strip.show();
+  Serial.println("brigtness: "+String(brightness));
+ 
   // Serial.println(String(alarm_hour)+"-"+String(alarm_minutes));
   int8_t hour,minutes,seconds,dates,month;
   int16_t year;
@@ -303,6 +350,8 @@ void loop()
     lcd.print(" ");
     lcd.print(humidity.relative_humidity);
     lcd.print("%");
+
+    
   }
 
   if(menu)
@@ -635,3 +684,6 @@ void loop()
     }    
   }
 }
+
+
+
